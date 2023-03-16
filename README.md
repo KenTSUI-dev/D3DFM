@@ -14,11 +14,18 @@ Set up the environment with environment.yml:
     conda env update --file environment.yml --prune
 
 
-## Command Line Interface (`cli.py`)
-This script is designed to rasterize and upload netCDF data to ArcGIS Online, and optionally generate a vector field from the uploaded data. The script includes two options:
+## Gallery
+|                                                  |                                                     |
+|--------------------------------------------------|-----------------------------------------------------|
+| ![Photo 1](\resources\ArcGISPro_D3DFM_nc.png)    | ![Photo 2](\resources\ArcGISOnline_D3DFM_nc.png)    |
+| *Rasterized D3DFM NetCDF imported to ArcGIS Pro* | *Rasterized D3DFM NetCDF uploaded to ArcGIS Online* |
 
-* --rasterize: Rasterizes an input netCDF file using information from an input file, and saves the output raster to a specified location.
-* --uploadagol: Uploads an input raster to ArcGIS Online using information from an input file, and optionally generates a vector field from the uploaded data using the --vectorize option.
+
+## Command Line Interface (`cli.py`)
+This script is designed to rasterize and upload D3DFM NetCDF data to ArcGIS Online, and optionally generate a vector field from the uploaded data. The script includes two options:
+
+* --rasterize: Rasterizes an input NetCDF file using information from an input file, and saves the output rasterized netCDF file to a specified location.
+* --uploadagol: Uploads an input rasterized NetCDF to ArcGIS Online using information from an input file, and optionally generates a vector field from the uploaded data using the --vectorize option.
 
 ### Usage
 
@@ -26,18 +33,18 @@ Example 1: Rasterize a NetCDF file
 
     python cli.py --rasterize input_rasterize.txt
 
-In this example, the script will rasterize the NetCDF file based on the input parameters in the "input_rasterize.txt" file.
+In this example, the script will rasterize the D3DFM NetCDF file based on the input parameters in the "input_rasterize.txt" file.
 
-Example 2: Upload the rasterized NetCDF file
+Example 2: Upload a rasterized NetCDF file
 
     python cli.py --uploadagol input_upload.txt
 
-In this example, the script will upload the rasterized file to ArcGIS Online based on the input parameters in the "input_upload.txt" file.
+In this example, the script will upload the rasterized NetCDF file to ArcGIS Online based on the input parameters in the "input_upload.txt" file.
 
-Example 3: Upload a NetCDF file and generate a vector field service from the uploaded data
+Example 3: Upload a rasterized NetCDF file and generate a vector field service from the uploaded data
 
     python cli.py  --uploadagol input_upload.txt --vectorize
-In this example, the script will upload the rasterized file to ArcGIS Online based on the input parameters in the "input_upload.txt" file. The uploaded data will be used to generate a vector field service.
+In this example, the script will upload the rasterized NetCDF file to ArcGIS Online based on the input parameters in the "input_upload.txt" file. The uploaded data will be used to generate a vector field service.
 
 ### Input File Format
 The input file for the `--rasterize` option should contain nine lines of data:
@@ -66,7 +73,7 @@ Each line should be separated by a newline character.  A sample input file is as
 
 
 
-The input file for the `--uploadagol` option should contain four or seven lines of data, depending on whether the --vectorize option is specified:
+The input file for the `--uploadagol` option should contain four or seven lines of data, depending on whether the `--vectorize` option is specified:
 
 1. ArcGIS Online username
 2. ArcGIS Online password
