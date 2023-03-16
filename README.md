@@ -17,7 +17,7 @@ Set up the environment with environment.yml:
 ## Gallery
 |                                                  |                                                     |
 |--------------------------------------------------|-----------------------------------------------------|
-| ![Photo 1](\resources\ArcGISPro_D3DFM_nc.png)    | ![Photo 2](\resources\ArcGISOnline_D3DFM_nc.png)    |
+| ![Photo 1](https://raw.githubusercontent.com/KenTSUI-dev/D3DFM/main/resources/ArcGISPro_D3DFM_nc.png)    | ![Photo 2](https://raw.githubusercontent.com/KenTSUI-dev/D3DFM/main/resources/ArcGISOnline_D3DFM_nc.png)    |
 | *Rasterized D3DFM NetCDF imported to ArcGIS Pro* | *Rasterized D3DFM NetCDF uploaded to ArcGIS Online* |
 
 
