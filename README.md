@@ -1,7 +1,8 @@
 # D3DFM
- Delft3D Flexible Mesh Processing Tool
+The Delft3D Flexible Mesh Processing Tool offers two key functions to enhance the use and visualization of modelling results from Delft3D FM:
+* Conversion of modelling results from Delft3D FM, which are in netCDF format using the [UGRID convention](http://ugrid-conventions.github.io/ugrid-conventions/), into a netCDF format that adheres to the [Climate & Forecast (CF) Metadata Conventions](http://cfconventions.org/). The CF conversion enables direct support and visualisation for the resulting data in various CF compliant software applications, particularly [ArcGIS Pro](https://pro.arcgis.com/en/pro-app/latest/help/data/multidimensional/essential-netcdf-vocabulary.htm).
 
-
+* Uploading the converted netCDF file into ArcGIS Online / ArcGIS Server as an Imagery Layer, allowing users to easily visualise the modelling results via a web browser.
 
 ## Requirements
 
@@ -15,16 +16,16 @@ Set up the environment with environment.yml:
 
 
 ## Gallery
-|                                                  |                                                     |
-|--------------------------------------------------|-----------------------------------------------------|
-| ![Photo 1](https://raw.githubusercontent.com/KenTSUI-dev/D3DFM/main/resources/ArcGISPro_D3DFM_nc.png)    | ![Photo 2](https://raw.githubusercontent.com/KenTSUI-dev/D3DFM/main/resources/ArcGISOnline_D3DFM_nc.png)    |
-| *Rasterized D3DFM NetCDF imported to ArcGIS Pro* | *Rasterized D3DFM NetCDF uploaded to ArcGIS Online* |
+|                                                                                                       |                                                                                                          |
+|-------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| ![Photo 1](https://raw.githubusercontent.com/KenTSUI-dev/D3DFM/main/resources/ArcGISPro_D3DFM_nc.png) | ![Photo 2](https://raw.githubusercontent.com/KenTSUI-dev/D3DFM/main/resources/ArcGISOnline_D3DFM_nc.png) |
+| *Rasterized D3DFM NetCDF in ArcGIS Pro*                                                               | *Rasterized D3DFM NetCDF  in a web browser.*                                                       |
 
 
 ## Command Line Interface (`cli.py`)
 This script is designed to rasterize and upload D3DFM NetCDF data to ArcGIS Online, and optionally generate a vector field from the uploaded data. The script includes two options:
 
-* --rasterize: Rasterizes an input NetCDF file using information from an input file, and saves the output rasterized netCDF file to a specified location.
+* --rasterize: Rasterizes (i.e. convert from UGRID to CF) an input NetCDF file using information from an input file, and saves the output rasterized netCDF file to a specified location.
 * --uploadagol: Uploads an input rasterized NetCDF to ArcGIS Online using information from an input file, and optionally generates a vector field from the uploaded data using the --vectorize option.
 
 ### Usage
@@ -57,7 +58,7 @@ The input file for the `--rasterize` option should contain nine lines of data:
 6. Comma-separated list of bounding box coordinates (in the format xmin,ymin,xmax,ymax)
 7. Number of cells in x direction
 8. Number of cells in y direction
-9. Data type for the output NetCDF file (e.g., int8)
+9. Data type for the output NetCDF file (int8 or int16)
 
 Each line should be separated by a newline character.  A sample input file is as follows:
 
