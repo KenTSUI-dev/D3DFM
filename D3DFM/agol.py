@@ -19,6 +19,7 @@ def upload_nc(username, password, input_nc, output_name):
 
     return item
 
+@retry(tries=10)
 def _vectorize_item(item, var_ucx, var_ucy, output_vec_name):
     layer = item.layers[0]
     raster_ucx  = multidimensional_filter(layer, variables=[var_ucx])
@@ -30,6 +31,7 @@ def upload_vectorize_nc(username, password, input_nc, output_name, var_ucx, var_
     item = upload_nc(username, password, input_nc, output_name)
     _vectorize_item(item, var_ucx, var_ucy, output_vec_name)
 
+@retry(tries=10)
 def vectorize_item(username, password, item_id, var_ucx, var_ucy, output_vec_name):
     gis = GIS(username=username, password=password)
     item = gis.content.get(item_id)
