@@ -315,8 +315,10 @@ class D3DFM_Dataset_Accessor():
                     layers,
                     {
                         "standard_name": "layer",
-                        "units": "layer",
-                        "positive" : "down",
+                        "units": "up",
+                        "positive" : "up",
+                        # By convention of Delft3D Flow or D-Flow FM, Layer 1 reprsents the bottom layer and Layer 1+
+                        # represents the layer closer to the surface. So "positive": "up" should be used.
                         "axis": "Z",
                         "_FillValue": -999,
                     }
@@ -640,12 +642,35 @@ class D3DFM_DataArray_Accessor:
 
 
 @timing
-def rasterize(input_nc, output_nc, variables, times, layers, bbox, ncellx, ncelly, dtype):
+def rasterize(
+        input_nc: str,
+        output_nc: str,
+        variables: list[str],
+        times,
+        layers,
+        bbox,
+        ncellx,
+        ncelly,
+        dtype):
     dataset = xr.open_dataset(
         input_nc,
         decode_times=False,
         chunks={'mesh2d_nLayers': 1, 'time': 1, 'mesh2d_nFaces': -1 }
     )
+
+    try:
+        decoded_time = dataset.d3dfm.decoded_time
+        ds = xr.Dataset(
+            data_vars=dict(
+                time_index=(['time'], np.arange(len(decoded_time)) )
+            ),
+            coords=dict(
+                time=decoded_time
+            )
+        )
+        times = ds.time_index.sel(time=slice(times[0], times[1], int(times[2]))).data
+    except:
+        times = range(*[int(num) for num in times])
 
     raster_ds = dataset.d3dfm.rasterize_variables(
         variables=variables,
@@ -664,181 +689,4 @@ def rasterize(input_nc, output_nc, variables, times, layers, bbox, ncellx, ncell
         print(f"Writing to {output_nc}")
         write_job.compute()
 
-
-@timing
-def sample_rasterize():
-    # client = Client(n_workers=2, threads_per_worker=2, memory_limit='1GB')
-    file_nc = r"D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep.nc" #r"D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep_duplicate.nc"
-    out_file = r"D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep_raster4.nc"
-    dataset = xr.open_dataset(
-        file_nc,
-        decode_times=False,
-        chunks={'mesh2d_nLayers': 1, 'time': 1, 'mesh2d_nFaces': -1 }
-    )
-
-    raster_ds = dataset.d3dfm.rasterize_variables(
-        variables="mesh2d_sa1",
-        times=range(30 * 24),
-        layers=[0, 10, 19],
-        bbox=[113.213111, 21.917770, 114.627601, 23.145613],
-        ncellx=800,
-        ncelly=800,
-    )
-    write_job = raster_ds.d3dfm.to_packed_netcdf(
-        out_file,
-        packing={"mesh2d_sa1": "int8"},
-        compute=False
-    )
-    with ProgressBar():
-        print(f"Writing to {out_file}")
-        write_job.compute()
-
-def sample_rasterize_ucxucy():
-    # client = Client(n_workers=2, threads_per_worker=2, memory_limit='1GB')
-    file_nc = r"D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep.nc" #r"D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep_duplicate.nc"
-    out_file = r"D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep_ucxucy.nc"
-    dataset = xr.open_dataset(
-        file_nc,
-        decode_times=False,
-        chunks={'mesh2d_nLayers': 1, 'time': 1, 'mesh2d_nFaces': -1 }
-    )
-
-    raster_ds = dataset.d3dfm.rasterize_variables(
-        variables=["mesh2d_ucx", "mesh2d_ucy"],
-        times=range(30 * 24),
-        layers=range(1),
-        bbox=[113.213111, 21.917770, 114.627601, 23.145613],
-        ncellx=800,
-        ncelly=800,
-    )
-    write_job = raster_ds.d3dfm.to_packed_netcdf(
-        out_file,
-        packing={"mesh2d_ucx": "int8", "mesh2d_ucy": "int8"},
-        compute=False
-    )
-    with ProgressBar():
-        print(f"Writing to {out_file}")
-        write_job.compute()
-
-
-@timing
-def sample_mean():
-    file_nc = r"D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep.nc" #r"D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep_duplicate.nc"
-    dataset = xr.open_dataset(
-        file_nc,
-        decode_times=False,
-        chunks={'mesh2d_nLayers': 1, 'time': 1, 'mesh2d_nFaces': -1}
-    )
-
-    daData = dataset.mesh2d_sa1
-    print(daData.d3dfm.coordinates)
-    daData_mean = daData.d3dfm.mean(layers=range(20))
-    # daData_mean.to_netcdf(r"D:\temp\D3DFM_2022Sep\HK-FM_merged_mesh2d_sa1_mean.nc", mode='w', )
-
-
-
-    # print(dataset.mesh2d_sa1.d3dfm.mean(range(720), range(10)))
-@timing
-def sample_merge_map_files():
-    # Rules:
-    # All datasets should contain the concatenating dimensions
-    # Each dataset may not need to contain the same variables.
-    # The same variable in all datasets should contain the same dimensions.
-    datasets = [xr.open_dataset(filepath, chunks={'mesh2d_nLayers': -1, 'time': -1, 'mesh2d_nFaces': -1})
-                 for filepath in glob.glob(r"D:\temp\D3DFM_2022Sep\HK-FM-Partitioned\HK-FM_00*_map.nc")]
-    dims = ['mesh2d_nFaces', 'mesh2d_nEdges', 'mesh2d_nNodes']
-    concat_dims = set(dims)
-    datasets_contain_concat_dims = [concat_dims.issubset(set(ds.dims)) for ds in datasets]
-    if not all(datasets_contain_concat_dims):
-        raise ValueError(f'Not all datasets contain the dims - {dims}.')
-    all_datasets_vars = {var for ds in datasets for var in ds.data_vars}
-    var_to_datasets = {var: [ds for ds in datasets if var in ds.data_vars ] for var in all_datasets_vars }
-
-    def all_equal(iterator):
-        iterator = iter(iterator)
-        try:
-            first = next(iterator)
-        except StopIteration:
-            return True
-        return all(first == x for x in iterator)
-
-    results={}
-    for var, var_datasets in var_to_datasets.items():
-        datasets_var_sizes = [ds[var].sizes for ds in datasets]
-        datasets_var_sizes_no_concat_dims = [
-            {dim:length for dim, length in size.items() if dim not in concat_dims}
-            for size in datasets_var_sizes
-        ]
-        datasets_var_dims = [ds[var].dims for ds in datasets]
-        if not all_equal(datasets_var_sizes_no_concat_dims) or not all_equal(datasets_var_dims):
-            continue
-
-        first_dataset = var_datasets[0]
-        var_dims = set(first_dataset[var].dims)
-        common_concat_dims = concat_dims-(concat_dims-var_dims)
-        if len(common_concat_dims) == 0:
-            results[var] = first_dataset[var]
-        elif len(common_concat_dims) == 1:
-            if var == "mesh2d_face_nodes":
-                offset = 0
-                data_vars = []
-                for var_dataset in var_datasets:
-                    data_var = var_dataset[var].copy()
-                    data_var.data += offset
-                    data_vars.append(data_var)
-                    offset += var_dataset.sizes['mesh2d_nNodes']
-                results[var] = xr.concat(data_vars, dim=list(common_concat_dims)[0])
-            else:
-                results[var] = xr.concat([var_dataset[var] for var_dataset in var_datasets], dim=list(common_concat_dims)[0])
-        elif len(common_concat_dims) >= 2:
-            print('unexpected')
-
-    combined_ds = xr.Dataset(
-        data_vars=results
-    )
-    i=0
-    for key, var in results.items():
-        mode = "w" if i==0 else "a"
-        print(f"Start to write {key}. Mode: {mode}.")
-        write_job = var.to_netcdf(
-            r"D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep_test.nc",
-            mode=mode,
-            format='NETCDF4',
-            # compute=False
-        )
-        i+=1
-        # with ProgressBar():
-        #     print(f"Start to write {key}")
-        #     write_job.compute()
-    # print(combined_ds['mesh2d_sa1'].chunksizes)
-
-    # combined_ds.to_netcdf(r"D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep_test.nc", format='NETCDF4')
-    # print(combined_ds.d3dfm.get_var("mesh2d_sa1").attrs)
-    # combined_ds.d3dfm.mesh2d_face_to_file(r"D:\temp\D3DFM_2022Sep\xr_combined_d3dfm_nc.shp")
-    out_file = r"D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep_ucxucy.nc"
-
-    # raster_ds = combined_ds.d3dfm.rasterize_variables(
-    #     variables=["mesh2d_ucx", "mesh2d_ucy"],
-    #     times=range(30 * 24),
-    #     layers=range(1),
-    #     bbox=[113.213111, 21.917770, 114.627601, 23.145613],
-    #     ncellx=800,
-    #     ncelly=800,
-    # )
-    # write_job = raster_ds.d3dfm.to_packed_netcdf(
-    #     out_file,
-    #     packing={"mesh2d_ucx": "int8", "mesh2d_ucy": "int8"},
-    #     compute=False
-    # )
-    # with ProgressBar():
-    #     print(f"Writing to {out_file}")
-    #     write_job.compute()
-
-
-
-if __name__ == "__main__":
-    sample_rasterize()
-    # sample_rasterize_ucxucy()
-    # sample_mean()
-    # sample_merge_map_files()
 
