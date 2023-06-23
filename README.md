@@ -73,11 +73,12 @@ The input files for `rasterize`, `uploadagol`, and `vectorize` should contain th
     1. Path to input NetCDF file
     2. Path to output NetCDF file
     3. Comma-separated list of variable names to rasterize
-    4. Range of times to rasterize (in the format `start,end,step` or `YYYY-MM-DDTHH:mm:ss.sss±HH, YYYY-MM-DDTHH:mm:ss.sss±HH, step`)
+    4. Range of times to rasterize (in the format `start,end,step` or `YYYY-MM-DDTHH:mm:ss.sss, YYYY-MM-DDTHH:mm:ss.sss, step`)
     5. Comma-separated list of layer names to rasterize
     6. Comma-separated list of bounding box coordinates (in the format `xmin,ymin,xmax,ymax`)
     7. Number of cells in x direction
     8. Number of cells in y direction
+    9. Data type for the output NetCDF file (int8 or int16)
 
 Each line should be separated by a newline character. A sample input file is as follows:
 
@@ -85,11 +86,12 @@ Each line should be separated by a newline character. A sample input file is as 
 D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep.nc
 D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep_raster4.nc
 mesh2d_sa1
-2023-06-01T00:00:00+08, 2023-06-30T00:00:01+08, 1
+2023-06-01T00:00:00, 2023-06-30T00:00:01, 1
 0, 10, 19
 113.213111, 21.917770, 114.627601, 23.145613
 800
 800
+int8
 ```
 
 - `uploadagol`:
@@ -118,9 +120,9 @@ Test_Dry_VecFie
     1. ArcGIS Online username
     2. ArcGIS Online password
     3. Item ID
-    5. Name of x-component of vector field variable
-    6. Name of y-component of vector field variable
-    7. Name of output vector field service
+    4. Name of x-component of vector field variable
+    5. Name of y-component of vector field variable
+    6. Name of output vector field service
 
 Each line should be separated by a newline character. A sample input file is as follows:
 
