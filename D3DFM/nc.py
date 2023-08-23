@@ -411,6 +411,9 @@ class D3DFM_Dataset_Accessor():
                 dtype = dtype.lower().strip()
 
                 if dtype == "none":
+                    packcoding[variable] = {
+                            "_FillValue": -999,
+                    }
                     continue
 
                 dtype_to_nbits = {
