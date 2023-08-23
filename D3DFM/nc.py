@@ -154,7 +154,10 @@ class D3DFM_Dataset_Accessor():
 
     def __mesh2d_face_union_to_gdf(self):
         union = self.__mesh2d_face_union()
-        union_gdf = gpd.GeoDataFrame(geometry=list(union.geoms))
+        if isinstance(union, Polygon):
+            union_gdf = gpd.GeoDataFrame(geometry=[union])
+        else:
+            union_gdf = gpd.GeoDataFrame(geometry=list(union.geoms))
         return union_gdf
 
 
@@ -315,7 +318,7 @@ class D3DFM_Dataset_Accessor():
                     layers,
                     {
                         "standard_name": "layer",
-                        "units": "up",
+                        # "units": "up", #this will cause error in Delft3d QuickPLot
                         "positive" : "up",
                         # By convention of Delft3D Flow or D-Flow FM, Layer 1 reprsents the bottom layer and Layer 1+
                         # represents the layer closer to the surface. So "positive": "up" should be used.
@@ -406,6 +409,9 @@ class D3DFM_Dataset_Accessor():
             packcoding={}
             for variable, dtype in packing.items():
                 dtype = dtype.lower().strip()
+
+                if dtype == "none":
+                    continue
 
                 dtype_to_nbits = {
                     "int16": {'nbits': 16, '_FillValue': -32768},

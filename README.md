@@ -73,7 +73,7 @@ The input files for `rasterize`, `uploadagol`, and `vectorize` should contain th
     1. Path to input NetCDF file
     2. Path to output NetCDF file
     3. Comma-separated list of variable names to rasterize
-    4. Range of times to rasterize (in the format `start,end,step` or `YYYY-MM-DDTHH:mm:ss.sss, YYYY-MM-DDTHH:mm:ss.sss, step`)
+    4. Range of times to rasterize (in the format `start,end,step` or `YYYY-MM-DDTHH:mm:ss, YYYY-MM-DDTHH:mm:ss, step`)
     5. Comma-separated list of layer names to rasterize
     6. Comma-separated list of bounding box coordinates (in the format `xmin,ymin,xmax,ymax`)
     7. Number of cells in x direction

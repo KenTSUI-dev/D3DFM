@@ -21,6 +21,7 @@ vectorize_parser.add_argument("inputfile", type=str, help="Path to the input fil
 
 # Parse the command line arguments
 args = parser.parse_args()
+#args = parser.parse_args(["rasterize", r"inputfile_rasterise.txt" ]) #for testing
 
 if args.subcommand == "rasterize":
     with open(args.inputfile, 'r') as file:
