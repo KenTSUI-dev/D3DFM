@@ -78,7 +78,8 @@ The input files for `rasterize`, `uploadagol`, and `vectorize` should contain th
     6. Comma-separated list of bounding box coordinates (in the format `xmin,ymin,xmax,ymax`)
     7. Number of cells in x direction
     8. Number of cells in y direction
-    9. Data type for the output NetCDF file (int8 or int16)
+    9. Data type for the output NetCDF file (int8 or int16 or none)
+  10. Time shift in seconds
 
 Each line should be separated by a newline character. A sample input file is as follows:
 
@@ -92,6 +93,7 @@ mesh2d_sa1
 800
 800
 int8
+-28800
 ```
 
 - `uploadagol`:

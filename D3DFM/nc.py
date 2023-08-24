@@ -660,7 +660,8 @@ def rasterize(
         bbox,
         ncellx,
         ncelly,
-        dtype):
+        dtype,
+        timeshift=0):
     dataset = xr.open_dataset(
         input_nc,
         decode_times=False,
@@ -689,6 +690,14 @@ def rasterize(
         ncellx=ncellx,
         ncelly=ncelly,
     )
+
+
+    time_units = raster_ds.time.attrs['units']
+    if 'second' in time_units:
+        raster_ds = raster_ds.assign_coords(time=('time', raster_ds.time.data +timeshift, raster_ds.time.attrs))
+    else:
+        raise TypeError('Time unit is not in seconds.')
+
     write_job = raster_ds.d3dfm.to_packed_netcdf(
         output_nc,
         packing={var: dtype for var in variables},
