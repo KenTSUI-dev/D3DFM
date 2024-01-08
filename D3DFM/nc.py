@@ -426,7 +426,7 @@ class D3DFM_Dataset_Accessor():
                     _FillValue = dtype_to_nbits[dtype]['_FillValue']
                     try:
                         scale_factor, add_offset = compute_scale_and_offset(
-                            self.get_var(variable).d3dfm.ifilter(times=-1),
+                            self.get_var(variable),
                             n=nbits,
                             num_reserveed_tail=1
                         )
