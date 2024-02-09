@@ -424,18 +424,13 @@ class D3DFM_Dataset_Accessor():
                 if dtype in dtype_to_nbits:
                     nbits = dtype_to_nbits[dtype]['nbits']
                     _FillValue = dtype_to_nbits[dtype]['_FillValue']
-                    try:
-                        scale_factor, add_offset = compute_scale_and_offset(
-                            self.get_var(variable),
-                            n=nbits,
-                            num_reserveed_tail=1
-                        )
-                    except:
-                        scale_factor, add_offset = compute_scale_and_offset(
-                            self.get_var(variable),
-                            n=nbits,
-                            num_reserveed_tail=1
-                        )
+
+                    scale_factor, add_offset = compute_scale_and_offset(
+                        self.get_var(variable),
+                        n=nbits,
+                        num_reserveed_tail=2
+                    )
+
 
                     packcoding[variable] = {
                             "dtype": dtype,
