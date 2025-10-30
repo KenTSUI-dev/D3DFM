@@ -78,7 +78,7 @@ The input files for `rasterize`, `uploadagol`, and `vectorize` should contain th
     6. Comma-separated list of bounding box coordinates (in the format `xmin,ymin,xmax,ymax`)
     7. Number of cells in x direction
     8. Number of cells in y direction
-    9. Data type for the output NetCDF file (int8 or int16 or none)
+    9. Comma-separated list of data types for variables (int8 or int16 or int32 or int64 or none )
   10. Time shift in seconds
 
 Each line should be separated by a newline character. A sample input file is as follows:
@@ -94,6 +94,32 @@ mesh2d_sa1
 800
 int8
 -28800
+```
+
+```
+D:\temp\Pre_HATS2A\HK-FMWAQ_merged_map.nc
+D:\temp\Pre_HATS2A\HK-FMWAQ_merged_map_4var1dtype.nc
+mesh2d_EColi,mesh2d_sa1,mesh2d_tem1,mesh2d_OXY
+2013-11-08T00:00:00, 2014-11-01T00:00:00, 1
+0, 10, 19
+113.213111, 21.917770, 114.627601, 23.145613
+800
+800
+int8
+0
+```
+
+```
+D:\temp\Pre_HATS2A\HK-FMWAQ_merged_map.nc
+D:\temp\Pre_HATS2A\HK-FMWAQ_merged_map_4var4dtype.nc
+mesh2d_EColi,mesh2d_sa1,mesh2d_tem1,mesh2d_OXY
+2013-11-08T00:00:00, 2014-11-01T00:00:00, 1
+0, 10, 19
+113.213111, 21.917770, 114.627601, 23.145613
+800
+800
+none, int8, int8, int8
+0
 ```
 
 - `uploadagol`:

@@ -417,6 +417,8 @@ class D3DFM_Dataset_Accessor():
                     continue
 
                 dtype_to_nbits = {
+                    "int64": {'nbits': 64, '_FillValue': -9223372036854775808},
+                    "int32": {'nbits': 32, '_FillValue': -2147483647},
                     "int16": {'nbits': 16, '_FillValue': -32768},
                     "int8": {'nbits': 8, '_FillValue': -128}
                 }
@@ -440,7 +442,7 @@ class D3DFM_Dataset_Accessor():
                     }
 
                 else:
-                    raise ValueError(f"Data type: {dtype} is not supported. Only accept 'int8' or 'int16'.")
+                    raise ValueError(f"Data type: {dtype} is not supported. Only accept 'int8', 'int16', 'int32', and 'int64'.")
 
             if len(packcoding)!=0:
                 encoding = packcoding
@@ -655,7 +657,7 @@ def rasterize(
         bbox,
         ncellx,
         ncelly,
-        dtype,
+        dtypes,
         timeshift=0):
     dataset = xr.open_dataset(
         input_nc,
@@ -693,9 +695,14 @@ def rasterize(
     else:
         raise TypeError('Time unit is not in seconds.')
 
+    if len(variables) == len(dtypes):
+        packing = {var: dtype for var, dtype in zip(variables, dtypes) }
+    elif len(dtypes) == 1:
+        packing = {var: dtypes[0] for var in variables}
+
     write_job = raster_ds.d3dfm.to_packed_netcdf(
         output_nc,
-        packing={var: dtype for var in variables},
+        packing=packing,
         compute=False
     )
     with ProgressBar():

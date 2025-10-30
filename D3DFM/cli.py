@@ -32,6 +32,7 @@ if args.subcommand == "rasterize":
         file_list[5] = [float(num) for num in file_list[5].split(',')]
         file_list[6] = int(file_list[6])
         file_list[7] = int(file_list[7])
+        file_list[8] = [s for s in file_list[8].split(',')]
         try: #for backward compatible
             file_list[9] = int(file_list[9])
         except:
