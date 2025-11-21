@@ -1,5 +1,6 @@
 import argparse
-from nc import rasterize
+import json
+from nc import rasterize, rasterize2
 from agol import upload_nc, upload_vectorize_nc, vectorize_item
 
 # Define the command line arguments
@@ -9,6 +10,10 @@ subparsers = parser.add_subparsers(dest="subcommand")
 # Rasterize subcommand
 rasterize_parser = subparsers.add_parser("rasterize", help="Rasterize the netcdf of out from D3DFM")
 rasterize_parser.add_argument("inputfile", type=str, help="Path to the input file", metavar="INPUTFILE1.TXT")
+
+# Rasterize2 subcommand
+rasterize2_parser = subparsers.add_parser("rasterize2", help="Rasterize the netcdf using parameters from a JSON file")
+rasterize2_parser.add_argument("jsonfile", type=str, help="Path to the JSON file", metavar="INPUTFILE1.JSON")
 
 # Uploadagol subcommand
 uploadagol_parser = subparsers.add_parser("uploadagol", help="Upload the rasterized netcdf to ArcGIS Online")
@@ -37,9 +42,19 @@ if args.subcommand == "rasterize":
             file_list[9] = int(file_list[9])
         except:
             pass
+        try: #for backward compatible
+            file_list[10] = int(file_list[10])
+        except:
+            pass
 
     print('Rasterizing data...')
     rasterize(*file_list)
+
+elif args.subcommand == "rasterize2":
+    with open(args.jsonfile, 'r') as jf:
+        config = json.load(jf)
+    print("Rasterizing data (JSON)...")
+    rasterize2(config)
 
 elif args.subcommand == "uploadagol":
     with open(args.inputfile, 'r') as file:

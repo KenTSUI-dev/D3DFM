@@ -216,177 +216,448 @@ class D3DFM_Dataset_Accessor():
             print('get_land_masking_indices executed')
         return self._land_masking.get((bbox, ncellx, ncelly))
 
+    def __get_land_mask(
+            self,
+            bbox: list[float],
+            ncellx: int,
+            ncelly: int,
+    ):
+        """
+        Generate and cache a land masking array for a target regular grid.
+
+        The method identifies which grid cells, defined within a given bounding box,
+        fall outside the model mesh (i.e., on land). It then stores and returns a
+        2D boolean mask array of shape (ncelly, ncellx), where:
+
+            - True  → The cell is on land (not covered by the mesh)
+            - False → The cell is within the mesh (water area)
+
+        Parameters
+        ----------
+        bbox : list[float]
+            Bounding box of the target domain as [left, bottom, right, top].
+        ncellx : int
+            Number of grid cells in the x (horizontal) direction.
+        ncelly : int
+            Number of grid cells in the y (vertical) direction.
+
+        Returns
+        -------
+        np.ndarray of bool
+            A 2D boolean array (ncelly, ncellx) marking land cells as True.
+        """
+        bbox = tuple(bbox)
+        if self._land_masking.get((bbox, ncellx, ncelly)) is None:
+            left, bottom, right, top = bbox
+            xc = np.linspace(left, right, ncellx)
+            yc = np.linspace(bottom, top, ncelly)
+            xpxl, ypxl = np.meshgrid(xc, yc)
+            union_poly = self.__mesh2d_face_union_to_gdf()
+            raster_points = gpd.GeoDataFrame(geometry=gpd.points_from_xy(xpxl.ravel(), ypxl.ravel()))
+            pointInPolys = sjoin(raster_points, union_poly, how='left')
+            nan_ind = pointInPolys.loc[pointInPolys.index_right.isna(), :].index
+            jpxl, ipxl = np.meshgrid(np.arange(ncellx), np.arange(ncelly))
+            ij = np.c_[ipxl.ravel(), jpxl.ravel()]
+            nan_ij = ij[nan_ind, :]
+            nan_i, nan_j = nan_ij[:, 0], nan_ij[:, 1]
+
+            # --- Create boolean mask (True = land, False = water) ---
+            mask = np.zeros((ncelly, ncellx), dtype=bool)
+            mask[nan_i, nan_j] = True
+
+            self._land_masking[(bbox, ncellx, ncelly)] = mask
+            print('get_land_masking_indices executed')
+
+        return self._land_masking.get((bbox, ncellx, ncelly))
+
     def rasterize_variable(
             self,
-            varname:str,
-            timesteps: Union[int,list[int]]=None,
-            layers: Union[int,list[int]]=None,
-            bbox: list[float]=None,
-            ncellx: int=1000,
-            ncelly: int=1000,
+            varname: str,
+            times: Union[int, list[int]] = None,
+            layers: Union[int, list[int]] = None,
+            bbox: list[float] = None,
+            ncellx: int = 1000,
+            ncelly: int = 1000,
+            ncellz: int = 20,
             method: str = "nearest",
-            maskland: bool = True,
+            apply_land_mask: bool = True,
+            apply_vert_interp: bool = False,
             missing_value: int = np.nan,
     ):
+        """
+        Interpolate a D-Flow FM variable from an unstructured mesh onto a regular
+        geographic (latitude–longitude) grid.
 
-        if type(timesteps) is int:
-            timesteps = [timesteps]
-        if type(layers) is int:
-            layers = [layers]
-        var = self.get_var(varname)
-        var_coordinates = var.d3dfm.coordinates
-        if (var_coordinates.get('lon') is None) or (var_coordinates.get('lat') is None):
-            raise ValueError(f"'{varname}' has no latitude or longitude.")
-        if var_coordinates.get('time') is None:
-            if timesteps is not None:
-                raise ValueError(f"'{varname}' does not have time coordinates but timesteps is not None.")
-        if var_coordinates.get('layer') is None:
-            if layers is not None:
-                raise ValueError(f"'{varname}' does not have layer coordinates but layers is not None.")
+        This function extracts a specified model variable from a D-Flow FM dataset
+        and rasterizes it onto a uniform latitude–longitude grid within a given
+        bounding box. It supports both horizontal and vertical interpolation,
+        optional time and layer extraction, and masking of land or below-bed cells.
 
-        # #Check whether the `ds.some_var.data` is dask array. Fast. Without loading data into memory.
-        isDaskArray = var.chunks is not None
+        Depending on the input variable’s dimensions and interpolation options, the
+        output array can be 2‑D, 3‑D, or 4‑D.
 
-        #Get the x- and y- coordinates of the flexible mesh, each in 1D array.
-        flexMesh_x_varname, flexMesh_y_varname = var_coordinates['lon'], var_coordinates['lat']
-        flexMesh_x = var[flexMesh_x_varname].data
-        flexMesh_y = var[flexMesh_y_varname].data
+        Parameters
+        ----------
+        varname : str
+            Name of the D-Flow FM variable to rasterize.
+        times : int or list[int], optional
+            Time indices to extract. Ignored if the variable has no time dimension.
+        layers : int or list[int], optional
+            Vertical layer indices to extract. Ignored if the variable has no layer dimension.
+        bbox : list[float]
+            Spatial bounding box `[xmin, ymin, xmax, ymax]` defining the target grid domain.
+        ncellx : int, default=1000
+            Number of grid cells along the longitude (X) axis.
+        ncelly : int, default=1000
+            Number of grid cells along the latitude (Y) axis.
+        ncellz : int, default=50
+            Number of vertical levels used when `apply_vert_interp=True`.
+        method : {"nearest"}, default="nearest"
+            Interpolation method.
+        apply_land_mask : bool, default=True
+            Whether to apply a binary land mask to exclude dry or invalid cells.
+        apply_vert_interp : bool, default=False
+            If True, performs vertical interpolation to construct a 3‑D grid defined by
+            `ncellz` depth levels derived from bed elevation.
+        missing_value : float, default=np.nan
+            Value used to fill cells outside the valid model domain or below the bed level.
 
-        #Generate x- and y- coordiantes of a regular grid, each in 2D array.
-        left, bottom, right, top = bbox
-        xc = np.linspace(left, right, ncellx)
-        yc = np.linspace(bottom, top, ncelly)
-        regGrid_x, regGrid_y = np.meshgrid(xc, yc)  # x pixel, y pixel
+        Returns
+        -------
+        xarray.DataArray
+            The rasterized variable as an `xarray.DataArray` where coordinate and dimension
+            names depend on the variable’s metadata and requested interpolation mode.
 
-        #Indices for nearest interpolation
-        flexMesh_indices = np.arange(flexMesh_x.shape[0])
-        regGrid_indices = griddata((flexMesh_x, flexMesh_y), flexMesh_indices, (regGrid_x, regGrid_y), method=method)
-        regGrid_shape = regGrid_indices.shape
-        regGrid_indices_1D = regGrid_indices.flatten()
+            | Available dimensions | Output shape | Description |
+            |----------------------|---------------|--------------|
+            | time + layer         | (time, layer, lat, lon) | Fully 4‑D spatiotemporal field |
+            | time only            | (time, lat, lon)        | Time series of 2‑D maps |
+            | layer only           | (layer, lat, lon)       | Vertical slices (steady state) |
+            | neither              | (lat, lon)              | Static 2‑D field |
+
+        Notes
+        -----
+        - Longitude and latitude coordinates are generated from `bbox` and cell counts.
+        - When `apply_vert_interp=True`, the function computes synthetic vertical
+          coordinates based on bed level (`mesh2d_flowelem_bl`) and interpolates the
+          unstructured variable field in three dimensions.
+        - Land and below-bed cells are automatically masked to `missing_value`.
+        - Ensures CF-compliant coordinate metadata for compatibility with GIS
+          and visualization tools such as Delft3D QuickPlot or xarray plotting.
+        """
+
+        if isinstance(times, int):
+            times = [times]
+
+        # --- Retrieve variable and metadata ---
+        ds_var = self.get_var(varname)
+        var_coordinates = ds_var.d3dfm.coordinates
+
+        # --- Validate coordinates ---
+        if var_coordinates.get("lon") is None or var_coordinates.get("lat") is None:
+            raise ValueError(f"'{varname}' has no latitude or longitude coordinates.")
+
+        has_time = var_coordinates.get("time") is not None
+        has_layer = var_coordinates.get("layer") is not None
+
+        if not has_time and times is not None:
+            raise ValueError(f"'{varname}' has no time dimension but 'timesteps' was provided.")
+        if not has_layer and layers is not None:
+            raise ValueError(f"'{varname}' has no layer dimension but 'layers' was provided.")
+
+        if apply_vert_interp:
+            # --- Flexible Mesh coordinates ---
+            flexMesh_x_varname, flexMesh_y_varname = var_coordinates["lon"], var_coordinates["lat"]
+            flexMesh_x = ds_var[flexMesh_x_varname].data # (nFaces,)
+            flexMesh_y = ds_var[flexMesh_y_varname].data # (nFaces,)
+
+            # ---- Flexible Mesh Bed Level ---
+            flexMesh_bedlevel = self.get_var('mesh2d_flowelem_bl').data #(nFaces,)
+            flexMesh_layer_varname = var_coordinates["layer"]
+            fm_nLayers = ds_var[flexMesh_layer_varname].size  # number of vertical layers
+
+            # --- Define vertical structure (Index 0=bottom, Index n=surface) ---
+            # layer_edges = np.linspace(0.0, 1.0, fm_nLayers + 1)
+            # layer_centers = 0.5 * (layer_edges[:-1] + layer_edges[1:])  # (nLayers,)
+            # layer_centers = layer_centers[::-1]  # so Index 0=bottom, Index n=surface
+            layer_edges = np.linspace(0.0, 1.0, fm_nLayers)[::-1]
+            flexMesh_z_3d = np.outer(flexMesh_bedlevel, layer_edges)  # (nFaces, nLayers)
+            flexMesh_x_3d = np.tile(flexMesh_x[:, np.newaxis], (1, fm_nLayers))  # (nFaces, nLayers)
+            flexMesh_y_3d = np.tile(flexMesh_y[:, np.newaxis], (1, fm_nLayers))  # (nFaces, nLayers)
+
+            # --- Flatten for interpolation ---
+            flexmesh_x_all = flexMesh_x_3d.ravel()  # (nFaces * nLayers,)
+            flexmesh_y_all = flexMesh_y_3d.ravel()  # (nFaces * nLayers,)
+            flexmesh_z_all = flexMesh_z_3d.ravel()  # (nFaces * nLayers,)
+
+            # --- Generate target regular grid ---
+            left, bottom, right, top = bbox
+            xc = np.linspace(left, right, ncellx)
+            yc = np.linspace(bottom, top, ncelly)
+            regGrid_x, regGrid_y = np.meshgrid(xc, yc) # (ncellx, ncelly)
+
+            # --- Interpolate bed level onto regular grid  ---
+            regGrid_bedlevel = griddata(
+                (flexMesh_x, flexMesh_y),
+                flexMesh_bedlevel,
+                (regGrid_x, regGrid_y),
+                method='linear',
+            )
+
+            # --- Define regularized vertical coordinate ---
+            # layer_edges = np.linspace(0.0, 1.0, ncellz + 1)
+            # layer_centers = 0.5 * (layer_edges[:-1] + layer_edges[1:])
+            # layer_centers = layer_centers[::-1]  # so Index 0=bottom, Index n=surface
+            layer_edges = np.linspace(0.0, 1.0, ncellz)[::-1]
+            zc = np.nanmin(regGrid_bedlevel) * layer_edges
+            regGrid_x_3d, regGrid_y_3d, regGrid_z_3d = np.meshgrid(xc, yc, zc) #(ncellx, ncelly, ncellz)
+
+            # --- Map unstructured indices to regular grid ---
+            flexMesh_indices = np.arange(flexmesh_x_all.size)
+            regGrid_indices = griddata(
+                (flexmesh_x_all, flexmesh_y_all, flexmesh_z_all),
+                flexMesh_indices,
+                (regGrid_x_3d, regGrid_y_3d, regGrid_z_3d),
+                method=method,
+            )
+            regGrid_shape = regGrid_indices.shape
+            regGrid_indices_1D = regGrid_indices.ravel() #(ncellx * ncelly * ncellz, )
+
+            # --- Below bed mask  ---
+            # reshape bed level to broadcast over vertical layers
+            bedlevel_per_point = np.repeat(regGrid_bedlevel.ravel(), ncellz)  # (ncellx * ncelly * ncellz,)
+
+            # points below the bed have z deeper (smaller) than their bedlevel value
+            below_bed_mask = regGrid_z_3d.ravel() < bedlevel_per_point    # (ncellx * ncelly * ncellz,)
+        else:
+            # --- Flexible Mesh coordinates ---
+            flexMesh_x_varname, flexMesh_y_varname = var_coordinates["lon"], var_coordinates["lat"]
+            flexMesh_x = ds_var[flexMesh_x_varname].data
+            flexMesh_y = ds_var[flexMesh_y_varname].data
+
+            # --- Generate target regular grid ---
+            left, bottom, right, top = bbox
+            xc = np.linspace(left, right, ncellx)
+            yc = np.linspace(bottom, top, ncelly)
+            regGrid_x, regGrid_y = np.meshgrid(xc, yc)
+
+            # --- Map unstructured indices to regular grid ---
+            flexMesh_indices = np.arange(flexMesh_x.shape[0])
+            regGrid_indices = griddata(
+                (flexMesh_x, flexMesh_y),
+                flexMesh_indices,
+                (regGrid_x, regGrid_y),
+                method=method,
+            )
+            regGrid_shape = regGrid_indices.shape
+            regGrid_indices_1D = regGrid_indices.flatten()
+
+        # --- Set available dimensions ---
+        if has_time:
+            times = np.array(times) if times is not None else np.arange(ds_var.sizes.get("time", 1))
+            ntimesteps = len(times)
+        else:
+            times = None
+            ntimesteps = 1
+
+        if has_layer and apply_vert_interp:
+            layers = np.arange(ncellz)
+            nlayers = ncellz
+        elif has_layer:
+            layers = np.array(layers)
+            nlayers = layers.size
+        else:
+            layers = None
+            nlayers = 1
+
+        # --- Extract subset ---
+        subset = {}
+        regGrid_var = ds_var
+        if apply_vert_interp:
+            regGrid_var = regGrid_var.stack(face_layer = ('mesh2d_nFaces', 'mesh2d_nLayers')).reset_index('face_layer')
+            subset['face_layer'] = regGrid_indices_1D
+        elif has_layer:
+            subset[ds_var.d3dfm.coordinates.get('layer')] = layers
+            subset[ds_var.d3dfm.coordinates.get('face')] = regGrid_indices_1D
+        else:
+            subset[ds_var.d3dfm.coordinates.get('face')]=regGrid_indices_1D
+
+        if has_time:
+            subset[ds_var.d3dfm.coordinates.get('time')] = times
+
+        regGrid_var = regGrid_var.isel(**subset).data
+
+        # --- Apply land or below-bedlevel masking ---
+        full_mask = np.zeros(ncelly* ncellx, dtype=bool)
+        if apply_land_mask:
+            land_mask = self.__get_land_mask(bbox, ncellx, ncelly).ravel()
+            full_mask |= land_mask
+        if apply_vert_interp:
+            full_mask = np.repeat(full_mask, ncellz)
+            full_mask |= below_bed_mask
+        if has_time and has_layer:
+            regGrid_var[:, full_mask] = missing_value
+        elif has_time:
+            regGrid_var[:, full_mask] = missing_value
+        elif has_layer:
+            regGrid_var[full_mask, :] = missing_value
+        else:
+            regGrid_var[full_mask] = missing_value
 
 
-        #Get the indices of raster xy which are on land (land masking indices)
-        if maskland:
-            nan_i, nan_j = self.__get_land_masking_indices(bbox, ncellx, ncelly)
-            nan_1Di = nan_i * ncellx + nan_j
 
-        ntimesteps = len(timesteps)
-        nlayers = len(layers)
-        timesteps = np.array(timesteps)
-        layers = np.array(layers)
+        # --- Reshape based on available dimensions ---
+        if has_time and has_layer:
+            regGrid_var = regGrid_var.reshape((ntimesteps,) + (ncellx, ncelly, nlayers) )
+            regGrid_var = da.transpose(regGrid_var, (0, 3, 1, 2))
+            dims = ["time", "layer", "lat", "lon"]
+        elif has_time:
+            regGrid_var = regGrid_var.reshape((ntimesteps,) + regGrid_shape)
+            dims = ["time", "lat", "lon"]
+        elif has_layer:
+            regGrid_var = regGrid_var.reshape(regGrid_shape + (nlayers,))
+            regGrid_var = da.transpose(regGrid_var, (2, 0, 1))
+            dims = ["layer", "lat", "lon"]
+        else:
+            regGrid_var = regGrid_var.reshape(regGrid_shape)
+            dims = ["lat", "lon"]
 
-        regGrid_var = var.d3dfm.ifilter(times=timesteps, layers=layers, faces=regGrid_indices_1D).data
-
-        if maskland:
-            regGrid_var[:, nan_1Di, :] = missing_value
-        regGrid_var = regGrid_var.reshape( (ntimesteps,) + regGrid_shape + (nlayers,) )
-        regGrid_var = da.transpose(regGrid_var, (0, 3, 1, 2))
-
-
-
+        # --- Define coordinates ---
         lat = regGrid_y[:, 0]
         lon = regGrid_x[0, :]
-        time = var['time'].d3dfm.ifilter(times=timesteps)
-        dataArray_var = xr.DataArray(
+        coords = {
+            "lon": (["lon"], lon, {
+                "standard_name": "longitude",
+                "long_name": "longitude",
+                "units": "degrees_east",
+                "axis": "X",
+                "_FillValue": -999,
+            }),
+            "lat": (["lat"], lat, {
+                "standard_name": "latitude",
+                "long_name": "latitude",
+                "units": "degrees_north",
+                "axis": "Y",
+                "_FillValue": -999,
+            }),
+        }
+
+        if has_layer:
+            coords["layer"] = (["layer"], layers, {
+                "standard_name": "layer",
+                # "units": "up", #this will cause error in Delft3d QuickPLot
+                "positive": "up",
+                # By convention of Delft3D Flow or D-Flow FM, Layer 1 reprsents the bottom layer and Layer 1+
+                # represents the layer closer to the surface. So "positive": "up" should be used.
+                "axis": "Z",
+                "_FillValue": -999,
+            })
+        if has_time:
+            time = ds_var["time"].d3dfm.ifilter(times=times)
+            coords["time"] = (["time"], time.data, {
+                "standard_name": "time",
+                "long_name": "time",
+                "units": time.attrs.get("units", ""),
+                "calendar": time.attrs.get("calendar", "proleptic_gregorian"),
+                "axis": "T",
+                "_FillValue": -999,
+            })
+
+        # --- Construct DataArray ---
+        ds_var_unit = ds_var.attrs.get("units", "")
+        ds_var_unit = ds_var_unit if ds_var_unit.isprintable() else ""
+        return xr.DataArray(
             data=regGrid_var,
-            dims=['time', 'layer', 'lat', 'lon'],
-            coords={
-                'lon': (
-                    ['lon'],
-                    lon,
-                    {
-                        "standard_name": "longitude",
-                        "long_name": "longitude",
-                        "units": "degrees_east",
-                        "axis": "X",
-                        "_FillValue": -999,
-                    }
-                ),
-                'lat': (
-                    ['lat'],
-                    lat,
-                    {
-                        "standard_name": "latitude",
-                        "long_name": "latitude",
-                        "units": "degrees_north",
-                        "axis": "Y",
-                        "_FillValue": -999,
-                    }
-                ),
-                'layer': (
-                    ['layer'],
-                    layers,
-                    {
-                        "standard_name": "layer",
-                        # "units": "up", #this will cause error in Delft3d QuickPLot
-                        "positive" : "up",
-                        # By convention of Delft3D Flow or D-Flow FM, Layer 1 reprsents the bottom layer and Layer 1+
-                        # represents the layer closer to the surface. So "positive": "up" should be used.
-                        "axis": "Z",
-                        "_FillValue": -999,
-                    }
-                ),
-                'time': (
-                    ['time'],
-                    time.data,
-                    {
-                        "standard_name": "time",
-                        "long_name": "time",
-                        "units": time.attrs['units'],
-                        "calendar": "proleptic_gregorian",
-                        "axis": "T",
-                        "_FillValue": -999,
-                    }
-                ),
+            dims=dims,
+            coords=coords,
+            name=varname,
+            attrs={
+                "long_name": ds_var.attrs.get("long_name", varname),
+                "units": ds_var_unit
             },
         )
-        return dataArray_var
-
-
     def rasterize_variables(
             self,
             variables: Union[str, list[str]],
-            times: Union[int, list[int]],
-            layers: Union[int,list[int]],
+            times: Union[int, list[int]] = None,
+            layers: Union[int, list[int]] = None,
             bbox: list[float] = [113.213111, 21.917770, 114.627601, 23.145613],
             ncellx: int = 1000,
             ncelly: int = 1000,
+            ncellz: int = 20,
             method: str = "nearest",
-            maskland: bool = True,
+            apply_land_mask: bool = True,
+            apply_vert_interp: bool = False,
             missing_value: int = np.nan,
     ):
-        if type(times) is int:
+        """
+        Rasterize multiple D-Flow FM variables onto a regular lat–lon grid.
+
+        This method wraps around `rasterize_variable()` to handle one or more
+        variables and combine the results into a single `xarray.Dataset`.
+
+        Parameters
+        ----------
+        variables : str or list[str]
+            One or more variable names to rasterize.
+        times : int or list[int], optional
+            Time indices to extract (if time dimension exists).
+        layers : int or list[int], optional
+            Layer indices to extract (if layer dimension exists).
+        bbox : list[float], default=[113.213111, 21.917770, 114.627601, 23.145613]
+            Bounding box [xmin, ymin, xmax, ymax].
+        ncellx, ncelly : int
+            Number of cells in longitude and latitude.
+        method : {"nearest", "linear", "cubic"}, default="nearest"
+            Interpolation method for griddata.
+        apply_land_mask : bool, default=True
+            Whether to mask land areas.
+        missing_value : int, default=np.nan
+            Value for missing cells.
+
+        Returns
+        -------
+        xarray.Dataset
+            Dataset containing rasterized variables as `DataArray`s.
+
+            | Input Case          | Output Shape | Dimensionality |
+            |---------------------|---------------|----------------|
+            | Has time & layer    | (time, layer, lat, lon) | 4-D |
+            | Only time           | (time, lat, lon)        | 3-D |
+            | Only layer          | (layer, lat, lon)       | 3-D |
+            | Neither             | (lat, lon)              | 2-D |
+        """
+        if isinstance(times, int):
             times = [times]
-        if type(layers) is int:
+        if isinstance(layers, int):
             layers = [layers]
-        if type(variables) is str:
+        if isinstance(variables, str):
             variables = [variables]
 
         data_vars = {}
         for variable in variables:
-            raster_variable = self.rasterize_variable(
+            data_vars[variable] = self.rasterize_variable(
                 variable,
-                times,
-                layers,
-                bbox,
-                ncellx,
-                ncelly,
+                times=times,
+                layers=layers,
+                bbox=bbox,
+                ncellx=ncellx,
+                ncelly=ncelly,
+                ncellz=ncellz,
                 method=method,
-                maskland=maskland,
+                apply_land_mask=apply_land_mask,
                 missing_value=missing_value,
+                apply_vert_interp = apply_vert_interp,
             )
-            data_vars[variable] = raster_variable
 
-        ds = xr.Dataset(
+        return xr.Dataset(
             data_vars=data_vars,
             attrs={
-                'Conventions': "CF-1.8",
+                "Conventions": "CF-1.8",
                 "Institution": "EPD",
                 "Author": "Ken TSUI",
             },
         )
-        return ds
-        # ds.d3dfm.to_packed_netcdf(path, packing={variable:dtype}, mode=mode)
 
 
     def to_packed_netcdf(
@@ -662,7 +933,7 @@ def rasterize(
     dataset = xr.open_dataset(
         input_nc,
         decode_times=False,
-        chunks={'mesh2d_nLayers': 1, 'time': 1, 'mesh2d_nFaces': -1 }
+        chunks={'time':1, 'mesh2d_nLayers': -1, 'mesh2d_nFaces': -1 },
     )
 
     try:
@@ -710,3 +981,85 @@ def rasterize(
         write_job.compute()
 
 
+@timing
+def rasterize2(config: dict):
+    """
+    Rasterize using parameters from a JSON configuration.
+
+    This function mirrors `rasterize()` but reads structured inputs from JSON.
+    JSON can specify times either by index range or datetime range, and optional
+    temporal downscale (in hour), vertical interpolation, and per-variable dtype.
+    """
+
+    input_nc = config["input_nc"]
+    output_nc = config["output_nc"]
+
+    time_cfg = config.get("time_cfg", None)
+    downscale_hours = config.get("downscale_hours", None)
+    bbox = config["bbox"]
+    ncellx = config["ncellx"]
+    ncelly = config["ncelly"]
+    timeshift = config.get("timeshift", 0)
+    ncellz = config.get("ncellz", None)
+    layers = config.get("layers", None)
+    apply_vert_interp = ncellz is not None
+
+    variables_info = config["variables"]
+    variables = [v["name"] for v in variables_info]
+    dtypes = [v.get("dtype", "none") for v in variables_info]
+
+    dataset = xr.open_dataset(
+        input_nc,
+        decode_times=False,
+        chunks={'time':1, 'mesh2d_nLayers': -1, 'mesh2d_nFaces': -1 },
+    )
+
+
+    # Time handling
+    times=None
+    decoded_time = dataset.d3dfm.decoded_time
+    step = 1
+    if downscale_hours:
+        time_diffs = np.diff(decoded_time) / np.timedelta64(1, "h")
+        median_dt = float(np.median(time_diffs))
+        step = max(1, int(round(downscale_hours / median_dt)))
+        times = np.arange(decoded_time.size)[::step]
+    if time_cfg:
+        start, end = time_cfg
+        decoded_time = dataset.d3dfm.decoded_time
+        ds = xr.Dataset(
+            data_vars=dict(
+                time_index=(['time'], np.arange(decoded_time.size))
+            ),
+            coords=dict(
+                time=decoded_time
+            )
+        )
+        times = ds.time_index.sel(time=slice(start, end, step)).data
+
+    raster_ds = dataset.d3dfm.rasterize_variables(
+        variables=variables,
+        times=times,
+        layers=layers,
+        bbox=bbox,
+        ncellx=ncellx,
+        ncelly=ncelly,
+        apply_vert_interp=apply_vert_interp,
+        ncellz=ncellz if apply_vert_interp else 0
+    )
+
+    if "time" in raster_ds.coords:
+        time_units = raster_ds.time.attrs.get("units", "")
+        if "second" in time_units:
+            raster_ds = raster_ds.assign_coords(
+                time=("time", raster_ds.time.data + timeshift, raster_ds.time.attrs)
+            )
+        else:
+            raise TypeError("Time unit is not in seconds.")
+
+    packing = {v: dt for v, dt in zip(variables, dtypes)}
+
+    write_job = raster_ds.d3dfm.to_packed_netcdf(output_nc, packing=packing, compute=False)
+    with ProgressBar():
+        print(f"Writing to {output_nc}")
+        write_job.compute()

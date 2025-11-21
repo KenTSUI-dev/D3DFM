@@ -22,70 +22,47 @@ Set up the environment with environment.yml:
 | *Rasterized D3DFM NetCDF in ArcGIS Pro*                                                               | *Rasterized D3DFM NetCDF  in a web browser.*                                                       |
 
 
-## Command Line Interface (`cli.py`)
-Command Line Interface (cli.py)
+## Command Line Usage
 
-This script provides a command-line interface to rasterize and upload D3DFM NetCDF data to ArcGIS Online. The script includes three options:
+The CLI (`cli.py`) provides four subcommands:
 
-- `rasterize`: Rasterizes (i.e. converts from UGRID to CF) an input NetCDF file using information from an input file, and saves the output rasterized NetCDF file to a specified location.
-- `uploadagol`: Uploads an input rasterized NetCDF to ArcGIS Online using information from an input file, and optionally generates a vector field from the uploaded data using the `--vectorize` option.
-- `vectorize`: Generates a vector field from an uploaded NetCDF data item in ArcGIS Online.
+| Subcommand | Description |
+| --- | --- |
+| `rasterize` | Rasterize a NetCDF file using parameters from a plain text file. |
+| `rasterize2` | Rasterize a NetCDF file using parameters structured in a **JSON configuration file**. |
+| `uploadagol` | Upload a rasterized NetCDF to ArcGIS Online. |
+| `vectorize` | Generate a vector field layer from an uploaded ArcGIS Online imagery item. |
 
-Usage
+## Commands
 
-Example 1: Rasterize a NetCDF file
+### 1. Rasterize
 
 ```
 python cli.py rasterize INPUTFILE1.TXT
 ```
 
-In this example, the script will rasterize the D3DFM NetCDF file based on the input parameters in the `INPUTFILE1.TXT` file.
+Rasterizes (i.e., converts from UGRID to CF-compliant) a Delft3D FM NetCDF file using parameters provided in `INPUTFILE1.TXT`.
 
-Example 2: Upload a rasterized NetCDF file
+### Input File Format (`INPUTFILE1.TXT`)
 
-```
-python cli.py uploadagol INPUTFILE2.TXT
-```
-
-In this example, the script will upload the rasterized NetCDF file to ArcGIS Online based on the input parameters in the `INPUTFILE2.TXT` file.
-
-Example 3: Upload a rasterized NetCDF file and generate a vector field service from the uploaded data
-
-```
-python cli.py uploadagol INPUTFILE2.TXT --vectorize
-```
-
-In this example, the script will upload the rasterized NetCDF file to ArcGIS Online based on the input parameters in the `INPUTFILE2.TXT` file. The uploaded data will be used to generate a vector field service.
-
-Example 4: Generate a vector field from an uploaded NetCDF data item in ArcGIS Online
-
-```
-python cli.py vectorize INPUTFILE3.TXT
-```
-
-In this example, the script will generate a vector field from an uploaded NetCDF data item in ArcGIS Online using the input parameters in the `INPUTFILE3.TXT` file.
-
-Input File Format
-
-The input files for `rasterize`, `uploadagol`, and `vectorize` should contain the following information:
-
-- `rasterize`:
-    1. Path to input NetCDF file
-    2. Path to output NetCDF file
-    3. Comma-separated list of variable names to rasterize
-    4. Range of times to rasterize (in the format `start,end,step` or `YYYY-MM-DDTHH:mm:ss, YYYY-MM-DDTHH:mm:ss, step`)
-    5. Comma-separated list of layer names to rasterize
-    6. Comma-separated list of bounding box coordinates (in the format `xmin,ymin,xmax,ymax`)
-    7. Number of cells in x direction
-    8. Number of cells in y direction
-    9. Comma-separated list of data types for variables (int8 or int16 or int32 or int64 or none )
-  10. Time shift in seconds
+| Line | Parameter | Description |
+| --- | --- | --- |
+| 1 | Input NetCDF path | Path to the original Delft3D FM NetCDF |
+| 2 | Output NetCDF path | Destination for rasterized CF-compliant file |
+| 3 | Variables | Comma-separated variable names |
+| 4 | Time range | Either index-based (`start,end,step`) or datetime-based (`YYYY-MM-DDTHH:mm:ss,YYYY-MM-DDTHH:mm:ss,step`) |
+| 5 | Layers | Comma-separated layer indices |
+| 6 | Bounding box | xmin, ymin, xmax, ymax |
+| 7 | ncellx | Number of grid cells in X direction |
+| 8 | ncelly | Number of grid cells in Y direction |
+| 9 | Data types | Per-variable data packing type (`int8`, `int16`, `int32`, `int64`, or `none`) |
+| 10 | Time shift | Offset in seconds |
 
 Each line should be separated by a newline character. A sample input file is as follows:
 
 ```
-D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep.nc
-D:\temp\D3DFM_2022Sep\HK-FM_merged_mapSep_raster4.nc
+D:\temp\HK-FM_merged_mapSep.nc
+D:\temp\HK-FM_merged_mapSep_raster4.nc
 mesh2d_sa1
 2023-06-01T00:00:00, 2023-06-30T00:00:01, 1
 0, 10, 19
@@ -97,8 +74,8 @@ int8
 ```
 
 ```
-D:\temp\Pre_HATS2A\HK-FMWAQ_merged_map.nc
-D:\temp\Pre_HATS2A\HK-FMWAQ_merged_map_4var1dtype.nc
+D:\temp\HK-FMWAQ_merged_map.nc
+D:\temp\HK-FMWAQ_merged_map_4var1dtype.nc
 mesh2d_EColi,mesh2d_sa1,mesh2d_tem1,mesh2d_OXY
 2013-11-08T00:00:00, 2014-11-01T00:00:00, 1
 0, 10, 19
@@ -110,8 +87,8 @@ int8
 ```
 
 ```
-D:\temp\Pre_HATS2A\HK-FMWAQ_merged_map.nc
-D:\temp\Pre_HATS2A\HK-FMWAQ_merged_map_4var4dtype.nc
+D:\temp\HK-FMWAQ_merged_map.nc
+D:\temp\HK-FMWAQ_merged_map_4var4dtype.nc
 mesh2d_EColi,mesh2d_sa1,mesh2d_tem1,mesh2d_OXY
 2013-11-08T00:00:00, 2014-11-01T00:00:00, 1
 0, 10, 19
@@ -122,39 +99,148 @@ none, int8, int8, int8
 0
 ```
 
-- `uploadagol`:
-    1. ArcGIS Online username
-    2. ArcGIS Online password
-    3. Path to input rasterized NetCDF file
-    4. Name of output service
-    5. Name of x-component of vector field variable (if --vectorize is specified)
-    6. Name of y-component of vector field variable (if --vectorize is specified)
-    7. Name of output vector field service (if --vectorize is specified)
-
-
-Each line should be separated by a newline character. A sample input file is as follows:
+### 2. Rasterize2 (JSON-based Configuration)
 
 ```
+python cli.py rasterize2 INPUTFILE1.JSON
+```
+
+Rasterizes a Delft3D FM NetCDF file using a **JSON configuration file**. This is the preferred and more flexible approach compared to `rasterize`.
+
+### Purpose
+
+`rasterize2` reads structured JSON input that defines spatial, temporal, and packing configurations for one or multiple variables. It supports:
+
+- Datetime-based slicing of time range (`time_cfg`)
+- Temporal downsampling (`downscale_hours`)
+- Vertical interpolation for 3‑D data (`ncellz`)
+- Independent variable data type packing (`dtype`)
+- Automatic CF metadata preservation
+
+### Example JSON Configuration
+
+
+```json
+{
+  "input_nc": "D:/temp/HK-FMWAQ_merged_map.nc",
+  "output_nc": "D:/temp/HK-FMWAQ_rasterized_CF.nc",
+  "bbox": [113.213111, 21.917770, 114.627601, 23.145613],
+  "ncellx": 800,
+  "ncelly": 800,
+  "time_cfg": ["2014-06-01T00:00:00", "2014-08-01T00:00:00"],
+  "downscale_hours": 6,
+  "timeshift": -28800,
+  "ncellz": 20,
+  "variables": [
+    {"name": "mesh2d_EColi", "dtype": "int8"},
+    {"name": "mesh2d_sa1", "dtype": "int8"},
+    {"name": "mesh2d_tem1", "dtype": "int16"},
+    {"name": "mesh2d_OXY", "dtype": "int16"}
+  ]
+}
+````
+
+### JSON Field Descriptions
+
+| Key | Type | Required | Description |
+| --- | --- | --- | --- |
+| `input_nc` | string | ✅ | Path to the source D3D FM NetCDF file |
+| `output_nc` | string | ✅ | Path to the destination rasterized NetCDF file |
+| `bbox` | list[float] | ✅ | `[xmin, ymin, xmax, ymax]` bounding box for target grid |
+| `ncellx`, `ncelly` | int | ✅ | Number of output grid cells in X and Y |
+| `time_cfg` | list[str] | ✳ | `[start, end]` ISO 8601 datetimes to define temporal range |
+| `downscale_hours` | int | ✳ | Temporal sampling step (approximate hours per frame) |
+| `timeshift` | int | ✳ | Offset (in seconds) to adjust CF time coordinate |
+| `ncellz` | int | ✳ | Enables vertical interpolation (defines number of depth layers) |
+| `layers` | list[int] | ✳ | Specific model layers to include (if `ncellz` not provided) |
+| `variables` | list[dict] | ✅ | Variable definitions (see below) |
+
+Each element in `variables` includes:
+
+| Key | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | ✅ | Variable in the source dataset |
+| `dtype` | string | ✳ | Output storage type (`none`, `int8`, `int16`, `int32`, `int64`) |
+
+### Output
+
+- CF-compliant **NetCDF4 file**, rasterized on a regular lat–lon grid.
+- Packed according to specified data types.
+- Optionally includes vertically interpolated 3‑D fields.
+
+### Internals
+
+Under the hood, `rasterize2()` performs:
+
+1. Opens and parses D3DFM NetCDF using xarray.
+2. Reads and interprets JSON fields into an execution plan.
+3. Uses `dataset.d3dfm.rasterize_variables()` to interpolate unstructured data.
+4. Applies automatic land masking and optional vertical interpolation.
+5. Adjusts CF time metadata based on `timeshift`.
+6. Exports data via `to_packed_netcdf()`, preserving compression and encoding.
+
+---
+
+### 3. Upload to ArcGIS Online
+
+
+
+```
+python cli.py uploadagol INPUTFILE2.TXT
+python cli.py uploadagol INPUTFILE2.TXT --vectorize
+```
+
+Uploads rasterized NetCDF data to ArcGIS Online (as a hosted imagery layer).
+
+Using `--vectorize` will also generate a vector field service.
+
+### Input File (`INPUTFILE2.TXT`)
+
+| Line | Description |
+| --- | --- |
+| 1 | AGOL username |
+| 2 | AGOL password |
+| 3 | Input NetCDF path |
+| 4 | Output imagery layer name |
+| 5 | X-component variable name (if vectorized) |
+| 6 | Y-component variable name (if vectorized) |
+| 7 | Output vector layer name (if vectorized) |
+
+---
+
+A sample input file is as follows:
+```text
 username
 password
-D:\temp\20230118_Tree\HK-FM_merged_map_ucxucy_dry1.nc
+D:\temp\HK-FM_merged_map_ucxucy_dry1.nc
 Test_Dry_ucxucy
 mesh2d_ucx
 mesh2d_ucy
 Test_Dry_VecFie
 ```
 
-- `vectorize`:
-    1. ArcGIS Online username
-    2. ArcGIS Online password
-    3. Item ID
-    4. Name of x-component of vector field variable
-    5. Name of y-component of vector field variable
-    6. Name of output vector field service
+### 4. Vectorize Existing ArcGIS Item
 
-Each line should be separated by a newline character. A sample input file is as follows:
+bash
 
 ```
+python cli.py vectorize INPUTFILE3.TXT
+```
+
+Converts an uploaded ArcGIS imagery item into an interactive vector field.
+
+### Input File (`INPUTFILE3.TXT`)
+
+| Line | Description |
+| --- | --- |
+| 1 | AGOL username |
+| 2 | AGOL password |
+| 3 | Item ID |
+| 4 | X-component variable |
+| 5 | Y-component variable |
+| 6 | Output vector service name |
+A sample input file is as follows:
+```text
 username
 password
 779aaa999bbbcccddd666eeefff333ff
@@ -162,5 +248,3 @@ mesh2d_ucx
 mesh2d_ucy
 Test_Dry_VecFie
 ```
-
-Note that the `vectorize` option requires an uploaded rasterized NetCDF data item in ArcGIS Online.
