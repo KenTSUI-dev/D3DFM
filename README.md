@@ -127,15 +127,12 @@ Rasterizes a Delft3D FM NetCDF file using a **JSON configuration file**. This is
   "bbox": [113.213111, 21.917770, 114.627601, 23.145613],
   "ncellx": 800,
   "ncelly": 800,
-  "time_cfg": ["2014-06-01T00:00:00", "2014-08-01T00:00:00"],
-  "downscale_hours": 6,
-  "timeshift": -28800,
   "ncellz": 20,
   "variables": [
-    {"name": "mesh2d_EColi", "dtype": "int8"},
+    {"name": "mesh2d_EColi", "dtype": "None"},
     {"name": "mesh2d_sa1", "dtype": "int8"},
-    {"name": "mesh2d_tem1", "dtype": "int16"},
-    {"name": "mesh2d_OXY", "dtype": "int16"}
+    {"name": "mesh2d_tem1", "dtype": "int8"},
+    {"name": "mesh2d_OXY", "dtype": "int8"}
   ]
 }
 ````
@@ -143,24 +140,24 @@ Rasterizes a Delft3D FM NetCDF file using a **JSON configuration file**. This is
 ### JSON Field Descriptions
 
 | Key | Type | Required | Description |
-| --- | --- | --- | --- |
-| `input_nc` | string | ✅ | Path to the source D3D FM NetCDF file |
-| `output_nc` | string | ✅ | Path to the destination rasterized NetCDF file |
-| `bbox` | list[float] | ✅ | `[xmin, ymin, xmax, ymax]` bounding box for target grid |
-| `ncellx`, `ncelly` | int | ✅ | Number of output grid cells in X and Y |
-| `time_cfg` | list[str] | ✳ | `[start, end]` ISO 8601 datetimes to define temporal range |
-| `downscale_hours` | int | ✳ | Temporal sampling step (approximate hours per frame) |
-| `timeshift` | int | ✳ | Offset (in seconds) to adjust CF time coordinate |
-| `ncellz` | int | ✳ | Enables vertical interpolation (defines number of depth layers) |
-| `layers` | list[int] | ✳ | Specific model layers to include (if `ncellz` not provided) |
-| `variables` | list[dict] | ✅ | Variable definitions (see below) |
+| --- | --- |----------| --- |
+| `input_nc` | string | ✅        | Path to the source D3D FM NetCDF file |
+| `output_nc` | string | ✅        | Path to the destination rasterized NetCDF file |
+| `bbox` | list[float] | ✅        | `[xmin, ymin, xmax, ymax]` bounding box for target grid |
+| `ncellx`, `ncelly` | int | ✅        | Number of output grid cells in X and Y |
+| `time_cfg` | list[str] | *        | `[start, end]` ISO 8601 datetimes to define temporal range |
+| `downscale_hours` | int | *        | Temporal sampling step (approximate hours per frame) |
+| `timeshift` | int | *        | Offset (in seconds) to adjust CF time coordinate |
+| `ncellz` | int | *        | Enables vertical interpolation (defines number of depth layers) |
+| `layers` | list[int] | *        | Specific model layers to include (if `ncellz` not provided) |
+| `variables` | list[dict] | ✅        | Variable definitions (see below) |
 
 Each element in `variables` includes:
 
 | Key | Type | Required | Description |
-| --- | --- | --- | --- |
-| `name` | string | ✅ | Variable in the source dataset |
-| `dtype` | string | ✳ | Output storage type (`none`, `int8`, `int16`, `int32`, `int64`) |
+| --- | --- |----------| --- |
+| `name` | string | ✅        | Variable in the source dataset |
+| `dtype` | string | *        | Output storage type (`none`, `int8`, `int16`, `int32`, `int64`) |
 
 ### Output
 
@@ -221,7 +218,6 @@ Test_Dry_VecFie
 
 ### 4. Vectorize Existing ArcGIS Item
 
-bash
 
 ```
 python cli.py vectorize INPUTFILE3.TXT
@@ -239,6 +235,7 @@ Converts an uploaded ArcGIS imagery item into an interactive vector field.
 | 4 | X-component variable |
 | 5 | Y-component variable |
 | 6 | Output vector service name |
+
 A sample input file is as follows:
 ```text
 username

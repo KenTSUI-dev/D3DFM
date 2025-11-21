@@ -566,8 +566,12 @@ class D3DFM_Dataset_Accessor():
         # --- Construct DataArray ---
         ds_var_unit = ds_var.attrs.get("units", "")
         ds_var_unit = ds_var_unit if ds_var_unit.isprintable() else ""
+        scale_factor = None
+        if "MPN/m3".lower() in ds_var_unit.lower():
+            scale_factor = 0.0001
+            ds_var_unit = "(cfu/100mL)"
         return xr.DataArray(
-            data=regGrid_var,
+            data=regGrid_var if scale_factor is None else scale_factor * regGrid_var,
             dims=dims,
             coords=coords,
             name=varname,
